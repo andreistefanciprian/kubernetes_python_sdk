@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-py-client
+  labels:
+    app: k8s-py-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: k8s-py-client
+  template:
+    metadata:
+      labels:
+        app: k8s-py-client
+    spec:
+      serviceAccountName: k8s-py-client
+      containers:
+      - name: k8s-py-client
+        image: andreistefanciprian/k8s-python-client:latest
