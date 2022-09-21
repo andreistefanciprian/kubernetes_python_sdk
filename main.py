@@ -3,8 +3,8 @@ from kubernetes import client, config
 
 def main():
     
-    config.load_incluster_config()  # inside cluster authentication
-    # config.load_kube_config()   # outside cluster authentication
+    # config.load_incluster_config()  # inside cluster authentication
+    config.load_kube_config()   # outside cluster authentication
 
     v1 = client.CoreV1Api()
 
