@@ -1,6 +1,6 @@
 ## Description
 
-Trying to build a k8s python client that lists all pods in Pending state and deletes the pods that have a particular error in Events.
+K8s python client that lists all pods in Pending state and deletes the pods that have a particular error in Events.
 
 ## Run code with python from outside the cluster
 
