@@ -73,10 +73,10 @@ class K8sClass:
             try:
                 self.core_api.delete_namespaced_pod(pod_name, pod_namespace)
             except Exception as e:
-                logging.info(e)
-                raise
+                logging.info(f'Pod {pod_name} in namespace {pod_namespace} could not be deleted: \n{e}')
+                # raise
             else:
-                logging.info(f'Deleted Pod {pod_namespace} in namespace {pod_namespace}')
+                logging.info(f'Deleted Pod {pod_name} in namespace {pod_namespace}')
         else:
             logging.info('Connection to K8s client failed.')
 
