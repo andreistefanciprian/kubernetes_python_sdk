@@ -39,5 +39,5 @@ kubectl apply -f deployment.yaml
 kubectl logs -l app=k8s-py-client -f
 
 # generate Pending pods
-bash generate_pending_pods.sh
+while True; do bash generate_pending_pods.sh; sleep 120; done
 ```
