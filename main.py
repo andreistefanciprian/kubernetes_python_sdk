@@ -9,8 +9,6 @@ class K8sClass:
     Deletes Pods in Pending state across all namespaces that have error message in Events.
     """
 
-    config.load_incluster_config()  # inside cluster authentication
-    # config.load_kube_config()   # outside cluster authentication
     logging.basicConfig(format='%(levelname)s:%(asctime)s:%(message)s', level=logging.INFO)
 
     def __init__(self):
@@ -67,7 +65,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
-    def delete_pending_pod(self, pod_name, pod_namespace):
+    def delete_pod(self, pod_name, pod_namespace):
         """Deletes Pod."""
         if self._initialise_client():
             try:
@@ -141,7 +139,7 @@ class K8sClass:
                     if self.verify_pod_exists(pod_name, pod_namespace):
                         # delete Pod if in Pending state
                         if self.get_pod_status(pod_name, pod_namespace) == 'Pending':
-                            self.delete_pending_pod(pod_name, pod_namespace)
+                            self.delete_pod(pod_name, pod_namespace)
                     else:
                         logging.info(f"Pod {pod_name} in namespace {pod_namespace} doesn't exist anymore!")
         else:
@@ -151,12 +149,15 @@ class K8sClass:
 def main():
 
     error_message = 'Failed to pull image "wrongimage"'
-    sleep_time = 30
+    sleep_time = 10
+
+    config.load_incluster_config()  # inside cluster authentication
+    # config.load_kube_config()   # outside cluster authentication
     while True:
         job = K8sClass()
         # job.get_pods_with_error_event(error_message)
         job.delete_pending_pods(error_message)
-        time.sleep = sleep_time
+        time.sleep(sleep_time)
 
 
 if __name__ == '__main__':
