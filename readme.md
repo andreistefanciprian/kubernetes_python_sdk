@@ -1,6 +1,6 @@
 ## Description
 
-Trying to build a k8s python client that lists all pods in Pending state and deletes the pods that have a particular error in Events.
+K8s python client that lists all pods in Pending state and deletes the pods that have a particular error in Events.
 
 ## Run code with python from outside the cluster
 
@@ -18,6 +18,9 @@ pip install -r requirements.txt
 
 # run script
 python main.py
+
+# generate Pending pods
+bash generate_pending_pods.sh
 ```
 
 ## Run app in k8s env
@@ -30,8 +33,11 @@ docker build -f Dockerfile -t andreistefanciprian/k8s-python-client:latest .
 docker image push andreistefanciprian/k8s-python-client
 
 # build k8s resources
-kubectl apply -f *.yaml
+kubectl apply -f deployment.yaml
 
 # check app logs
 kubectl logs -l app=k8s-py-client -f
+
+# generate Pending pods
+bash generate_pending_pods.sh
 ```
