@@ -1,7 +1,7 @@
 from kubernetes import client, config
 import logging
 import time
-
+from datetime import datetime, timezone
 
 class K8sClass:
 
@@ -15,7 +15,22 @@ class K8sClass:
         self.core_api = client.CoreV1Api()
         self.namespaces = []
         self._k8s_client_connected = False
+        self.__event_age = 600
 
+    def __time_track(func):
+        """
+        Decorator used for measuring time execution of methods.
+        """
+
+        def wrapper(*arg, **kw):
+            t1 = time.time()
+            result = func(*arg, **kw)
+            total_time = time.time() - t1
+            print(f'{func.__name__} ran in {total_time} seconds.')
+            return result
+        return wrapper
+
+    # @__time_track 
     def _initialise_client(self):
         if not self._k8s_client_connected:
             try:
@@ -30,6 +45,7 @@ class K8sClass:
         else:
             return True
 
+    # @__time_track 
     def get_namespaces(self):
         """"Returns a list of namespaces in the cluster."""
         if self._initialise_client():
@@ -46,6 +62,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
+    # @__time_track 
     def verify_pod_exists(self, pod_name, pod_namespace):
         """
         Verifies if Pod exists.
@@ -63,6 +80,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
+    # @__time_track 
     def delete_pod(self, pod_name, pod_namespace):
         """Deletes Pod."""
         if self._initialise_client():
@@ -76,6 +94,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
+    # @__time_track 
     def get_pod_status(self, pod_name, pod_namespace):
         """"Returns Pod status."""
         if self._initialise_client():
@@ -92,6 +111,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
+    @__time_track 
     def get_pods_with_error_event(self, error_message):
         """
         Returns a list of existing Pods with error message in events.
@@ -108,7 +128,10 @@ class K8sClass:
                     raise
                 else:
                     for i in result.items:
-                        if error_message in i.message:
+                        # calculate Event age in seconds
+                        event_age = datetime.now(timezone.utc) - i.last_timestamp
+                        # if event is recent and contains Error message
+                        if event_age.seconds < self.__event_age and error_message in i.message:
                             event_type = i.type
                             event_reason = i.reason
                             event_message = i.message
@@ -127,13 +150,13 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
+    # @__time_track 
     def delete_pending_pods(self, error_message):
         """Delete Pending Pods with error message from all namespaces."""
         if self._initialise_client():
             pods_in_pending_state = self.get_pods_with_error_event(error_message)
             if len(pods_in_pending_state) >= 1:
-                # wait a few seconds just in case Pod transition state from Pending to Running
-                time.sleep(30)
+                time.sleep(5)   # wait a few seconds just in case Pod transition state from Pending to Running
                 for pod_name, pod_namespace in pods_in_pending_state:
                     # verify Pod exists
                     if self.verify_pod_exists(pod_name, pod_namespace):
@@ -149,7 +172,7 @@ class K8sClass:
 def main():
 
     error_message = 'Failed to pull image "wrongimage"'
-    sleep_time = 30
+    sleep_time = 60
 
     config.load_incluster_config()  # inside cluster authentication
     # config.load_kube_config()   # outside cluster authentication
