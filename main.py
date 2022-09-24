@@ -12,8 +12,6 @@ class K8sClass:
     logging.basicConfig(format='%(levelname)s:%(asctime)s:%(message)s', level=logging.INFO)
 
     def __init__(self):
-
-        # Init Kubernetes
         self.core_api = client.CoreV1Api()
         self.namespaces = []
         self._k8s_client_connected = False
@@ -130,10 +128,12 @@ class K8sClass:
             logging.info('Connection to K8s client failed.')
 
     def delete_pending_pods(self, error_message):
-        """Deletes Pending Pods with error message from all namespaces."""
+        """Delete Pending Pods with error message from all namespaces."""
         if self._initialise_client():
             pods_in_pending_state = self.get_pods_with_error_event(error_message)
             if len(pods_in_pending_state) >= 1:
+                # wait a few seconds just in case Pod transition state from Pending to Running
+                time.sleep(30)
                 for pod_name, pod_namespace in pods_in_pending_state:
                     # verify Pod exists
                     if self.verify_pod_exists(pod_name, pod_namespace):
@@ -149,13 +149,12 @@ class K8sClass:
 def main():
 
     error_message = 'Failed to pull image "wrongimage"'
-    sleep_time = 10
+    sleep_time = 30
 
     config.load_incluster_config()  # inside cluster authentication
     # config.load_kube_config()   # outside cluster authentication
     while True:
         job = K8sClass()
-        # job.get_pods_with_error_event(error_message)
         job.delete_pending_pods(error_message)
         time.sleep(sleep_time)
 
