@@ -2,6 +2,7 @@ from kubernetes import client, config
 import logging
 import time
 from datetime import datetime, timezone
+import os
 
 class K8sClass:
 
@@ -14,8 +15,8 @@ class K8sClass:
     def __init__(self):
         self.core_api = client.CoreV1Api()
         self.namespaces = []
-        self._k8s_client_connected = False
-        self.__event_age = 600
+        self.__k8s_client_connected = False
+        self.__event_age = 120
 
     def __time_track(func):
         """
@@ -32,7 +33,7 @@ class K8sClass:
 
     # @__time_track 
     def _initialise_client(self):
-        if not self._k8s_client_connected:
+        if not self.__k8s_client_connected:
             try:
                 client.CoreV1Api
             except Exception as e:
@@ -40,7 +41,7 @@ class K8sClass:
                 raise
             else:
                 logging.debug('Connection to K8s client was established.')
-                self._k8s_client_connected = True
+                self.__k8s_client_connected = True
                 return True
         else:
             return True
@@ -128,20 +129,21 @@ class K8sClass:
                     raise
                 else:
                     for i in result.items:
-                        # calculate Event age in seconds
-                        event_age = datetime.now(timezone.utc) - i.last_timestamp
-                        # if event is recent and contains Error message
-                        if event_age.seconds < self.__event_age and error_message in i.message:
-                            event_type = i.type
-                            event_reason = i.reason
-                            event_message = i.message
-                            event_pod = i.involved_object.name
-                            event_namespace = i.involved_object.namespace
-                            logging.debug(f'{event_type} {event_reason} {event_pod} {event_namespace} \n{event_message}')
-                            if self.verify_pod_exists(event_pod, event_namespace):
-                                errored_pods.append((event_pod, event_namespace))
-                            else:
-                                logging.debug(f"Pod {event_pod} in namespace {event_namespace} doesn't exist anymore!")
+                        if i.involved_object.kind == 'Pod':
+                            # calculate Event age in seconds
+                            event_age = datetime.now(timezone.utc) - i.last_timestamp
+                            # if event is recent and contains Error message
+                            if event_age.seconds < self.__event_age and error_message in i.message:
+                                event_type = i.type
+                                event_reason = i.reason
+                                event_message = i.message
+                                event_pod = i.involved_object.name
+                                event_namespace = i.involved_object.namespace
+                                logging.debug(f'{event_type} {event_reason} {event_pod} {event_namespace} \n{event_message}')
+                                if self.verify_pod_exists(event_pod, event_namespace):
+                                    errored_pods.append((event_pod, event_namespace))
+                                else:
+                                    logging.debug(f"Pod {event_pod} in namespace {event_namespace} doesn't exist anymore!")
             if len(errored_pods) > 0:
                 logging.info(f'There are {len(errored_pods)} Pods with Error Event {error_message} in Pending state: \n{errored_pods}')
             else:
@@ -173,9 +175,14 @@ def main():
 
     error_message = 'Failed to pull image "wrongimage"'
     sleep_time = 60
+    kube_auth = os.getenv("KUBE_AUTH_INSIDE_CLUSTER", False)
 
-    config.load_incluster_config()  # inside cluster authentication
-    # config.load_kube_config()   # outside cluster authentication
+    # authenticate k8s client
+    if kube_auth:
+        config.load_incluster_config()  # inside cluster authentication
+    else:
+        config.load_kube_config()  # outside cluster authentication
+
     while True:
         job = K8sClass()
         job.delete_pending_pods(error_message)
