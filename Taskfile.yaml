@@ -1,0 +1,25 @@
+version: '3'
+
+env:
+  DOCKER_IMAGE: andreistefanciprian/pod-restarter
+  APP_NAME: pod-restarter
+
+tasks:
+
+  uninstall:
+    cmds:
+      - helm uninstall {{.APP_NAME}}
+
+  build-image:
+    cmds:
+      - docker build -t {{.DOCKER_IMAGE}} .
+      - docker image push {{.DOCKER_IMAGE}}
+
+  install:
+    cmds:
+      - task: build-image
+      - helm upgrade --install --set image.digest={{.DOCKER_TAG}} {{.APP_NAME}} pod_restarter
+      
+    vars:
+      DOCKER_TAG:
+        sh: docker image ls {{.DOCKER_IMAGE}} --digests | grep sha256 | awk '{print $3}' | head -n 1
