@@ -3,6 +3,8 @@ import logging
 import time
 from datetime import datetime, timezone
 import os
+import signal
+
 
 class K8sClass:
 
@@ -10,13 +12,18 @@ class K8sClass:
     Deletes Pods in Pending state across all namespaces that have error message in Events.
     """
 
-    logging.basicConfig(format='%(levelname)s:%(asctime)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(
+        format='%(levelname)s:%(asctime)s:%(message)s',
+        level=logging.INFO
+        )
 
-    def __init__(self):
+    def __init__(self, error_message, poll_interval):
         self.core_api = client.CoreV1Api()
         self.namespaces = []
         self.__k8s_client_connected = False
-        self.__event_age = 120
+        self.error_message = error_message
+        self.poll_interval = 60 if poll_interval is None else poll_interval
+        self.__event_age = poll_interval + 10
 
     def __time_track(func):
         """
@@ -47,7 +54,7 @@ class K8sClass:
             return True
 
     # @__time_track 
-    def get_namespaces(self):
+    def __get_namespaces(self):
         """"Returns a list of namespaces in the cluster."""
         if self._initialise_client():
             try:
@@ -64,7 +71,7 @@ class K8sClass:
             logging.info('Connection to K8s client failed.')
 
     # @__time_track 
-    def verify_pod_exists(self, pod_name, pod_namespace):
+    def __verify_pod_exists(self, pod_name, pod_namespace):
         """
         Verifies if Pod exists.
         returns: bool
@@ -82,7 +89,7 @@ class K8sClass:
             logging.info('Connection to K8s client failed.')
 
     # @__time_track 
-    def delete_pod(self, pod_name, pod_namespace):
+    def __delete_pod(self, pod_name, pod_namespace):
         """Deletes Pod."""
         if self._initialise_client():
             try:
@@ -96,7 +103,7 @@ class K8sClass:
             logging.info('Connection to K8s client failed.')
 
     # @__time_track 
-    def get_pod_status(self, pod_name, pod_namespace):
+    def __get_pod_status(self, pod_name, pod_namespace):
         """"Returns Pod status."""
         if self._initialise_client():
             logging.debug(f'Getting {pod_namespace}/{pod_name} Pod status')
@@ -113,13 +120,13 @@ class K8sClass:
             logging.info('Connection to K8s client failed.')
 
     @__time_track 
-    def get_pods_with_error_event(self, error_message):
+    def __get_pods_with_error_event(self, error_message):
         """
         Returns a list of existing Pods with error message in events.
         return: {(pod_name, pod_namespace),...}
         """
         if self._initialise_client():
-            self.namespaces = self.get_namespaces()
+            self.namespaces = self.__get_namespaces()
             errored_pods = []
             for namespace in self.namespaces:
                 try:
@@ -140,7 +147,7 @@ class K8sClass:
                                 event_pod = i.involved_object.name
                                 event_namespace = i.involved_object.namespace
                                 logging.debug(f'{event_type} {event_reason} {event_pod} {event_namespace} \n{event_message}')
-                                if self.verify_pod_exists(event_pod, event_namespace):
+                                if self.__verify_pod_exists(event_pod, event_namespace):
                                     errored_pods.append((event_pod, event_namespace))
                                 else:
                                     logging.debug(f"Pod {event_pod} in namespace {event_namespace} doesn't exist anymore!")
@@ -153,28 +160,41 @@ class K8sClass:
             logging.info('Connection to K8s client failed.')
 
     # @__time_track 
-    def delete_pending_pods(self, error_message):
+    def __delete_pending_pods(self):
         """Delete Pending Pods with error message from all namespaces."""
         if self._initialise_client():
-            pods_in_pending_state = self.get_pods_with_error_event(error_message)
+            pods_in_pending_state = self.__get_pods_with_error_event(self.error_message)
             if len(pods_in_pending_state) >= 1:
                 time.sleep(5)   # wait a few seconds just in case Pod transition state from Pending to Running
                 for pod_name, pod_namespace in pods_in_pending_state:
                     # verify Pod exists
-                    if self.verify_pod_exists(pod_name, pod_namespace):
+                    if self.__verify_pod_exists(pod_name, pod_namespace):
                         # delete Pod if in Pending state
-                        if self.get_pod_status(pod_name, pod_namespace) == 'Pending':
-                            self.delete_pod(pod_name, pod_namespace)
+                        if self.__get_pod_status(pod_name, pod_namespace) == 'Pending':
+                            self.__delete_pod(pod_name, pod_namespace)
                     else:
                         logging.info(f"Pod {pod_name} in namespace {pod_namespace} doesn't exist anymore!")
         else:
             logging.info('Connection to K8s client failed.')
 
+    def delete_pending_pods_loop(self):
+        """
+        Check events every self.poll_interval seconds for Pending Pods.
+        Delete pendng pods loop
+        """
+
+        while True:
+            self.__delete_pending_pods()
+            time.sleep(self.poll_interval)
+
+
+def handler(signum, frame):
+    print("Program was interrupted with CTRL+C")
+    exit(0)
 
 def main():
 
     error_message = 'Failed to pull image "wrongimage"'
-    sleep_time = 60
     kube_auth = os.getenv("KUBE_AUTH_INSIDE_CLUSTER", False)
 
     # authenticate k8s client
@@ -183,11 +203,12 @@ def main():
     else:
         config.load_kube_config()  # outside cluster authentication
 
-    while True:
-        job = K8sClass()
-        job.delete_pending_pods(error_message)
-        time.sleep(sleep_time)
+    job = K8sClass(error_message=error_message, poll_interval=20)
+    job.delete_pending_pods_loop()
 
 
 if __name__ == '__main__':
+    # catch keyboard interrupt signal and exit gracefully
+    signal.signal(signal.SIGINT, handler)
+
     main()
