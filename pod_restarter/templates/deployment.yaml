@@ -21,10 +21,10 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
         env:
           - name: KUBE_AUTH_INSIDE_CLUSTER
             value: "True"
+      {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
