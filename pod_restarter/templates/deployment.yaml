@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pod_restarter.fullname" . }}
+  labels:
+    {{- include "pod_restarter.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pod_restarter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pod_restarter.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "pod_restarter.fullname" . }}
+      containers:
+      - name: {{ include "pod_restarter.fullname" . }}
+        image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+        env:
+          - name: KUBE_AUTH_INSIDE_CLUSTER
+            value: "True"
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

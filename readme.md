@@ -41,3 +41,16 @@ kubectl logs -l app=k8s-py-client -f
 # generate Pending pods
 while True; do bash generate_pending_pods.sh; sleep 120; done
 ```
+
+# Deploy with helm
+
+* Requirements:
+    * helm
+    * taskfile
+    * kubectl
+
+```
+# instal/uninstall with taskfile
+task install
+task uninstall
+```
