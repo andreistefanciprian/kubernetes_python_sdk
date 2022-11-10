@@ -48,3 +48,6 @@ spec:
       containers:
       - name: k8s-py-client
         image: andreistefanciprian/k8s-python-client:latest
+        env:
+          - name: KUBE_AUTH_INSIDE_CLUSTER
+            value: "True"
