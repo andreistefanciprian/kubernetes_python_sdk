@@ -203,6 +203,7 @@ def main():
     else:
         config.load_kube_config()  # outside cluster authentication
 
+    # execute loop
     job = K8sClass(error_message=error_message, poll_interval=20)
     job.delete_pending_pods_loop()
 

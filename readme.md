@@ -51,6 +51,7 @@ while True; do bash generate_pending_pods.sh; sleep 120; done
 
 ```
 # instal/uninstall with taskfile
+task build
 task install
 task uninstall
 ```
