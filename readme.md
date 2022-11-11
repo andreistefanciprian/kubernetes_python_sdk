@@ -1,10 +1,14 @@
-## Description
+### Description
 
-K8s python client that lists all pods in Pending state and deletes the pods that have a particular error in Events.
+Build K8s python client that lists all pods in Pending state and deletes the pods that have a particular error in Events.
 
-# Run script locally, from outside the cluster
+* Requirements:
+    * helm
+    * taskfile
+    * kubectl
+    
 
-Note: Use `config.load_kube_config()` method to authenticate to k8s cluster when running this script localy (from outside cluster)!
+### Run script on local machine/laptop
 
 ```
 # create python3 virtual env
@@ -18,40 +22,23 @@ pip install -r requirements.txt
 
 # run script
 python main.py
-
-# generate Pending pods
-bash generate_pending_pods.sh
 ```
 
-# Run script as k8s deployment
-
-Note: Use `config.load_incluster_config()` method to authenticate to k8s cluster when running this script as deployment, from inside the cluster!
-
-```
-# build container image
-docker build -f Dockerfile -t andreistefanciprian/k8s-python-client:latest .
-docker image push andreistefanciprian/k8s-python-client
-
-# build k8s resources
-kubectl apply -f deployment.yaml
-
-# check app logs
-kubectl logs -l app=k8s-py-client -f
-
-# generate Pending pods
-while True; do bash generate_pending_pods.sh; sleep 120; done
-```
-
-# Deploy with helm
-
-* Requirements:
-    * helm
-    * taskfile
-    * kubectl
+### Deploy to k8s with helm
 
 ```
 # instal/uninstall with taskfile
 task build
 task install
 task uninstall
+```
+
+### Test 
+
+```
+# generate Pending pods
+while True; do task generate-pending-pods; sleep 120; done
+
+# check app logs
+kubectl logs -l app=k8s-py-client -f
 ```
