@@ -1,10 +1,9 @@
-# This script generates Pods in Pending state
+# This script generates Pods in Pending state due to failure to pull image
 
 for ns in `kubectl get namespaces --no-headers | awk '{print $1}'`; do
     pod_name="test-pod-$(( $RANDOM % 5000 + 1 ))"
     echo Creating pod $pod_name in namespace $ns
     kubectl --namespace $ns run $pod_name --image=wrongimage
-    # kubectl --namespace $ns delete pod $pod_name
 done
 
 # echo Non Running State Pods
