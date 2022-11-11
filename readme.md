@@ -6,7 +6,7 @@ Build K8s python client that lists all pods in Pending state and deletes the pod
     * helm
     * taskfile
     * kubectl
-    
+
 
 ### Run script on local machine/laptop
 
@@ -27,9 +27,16 @@ python main.py
 ### Deploy to k8s with helm
 
 ```
-# instal/uninstall with taskfile
+# build container image
 task build
+
+# deploy helm chart
 task install
+
+# verify helm release
+helm list -A
+
+# uninstall helm chart
 task uninstall
 ```
 
@@ -37,7 +44,7 @@ task uninstall
 
 ```
 # generate Pending pods
-while True; do task generate-pending-pods; sleep 120; done
+while True; do task generate-pending-pods; sleep 300; done
 
 # check app logs
 kubectl logs -l app=k8s-py-client -f
