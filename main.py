@@ -1,5 +1,6 @@
 """
-This script runs in a k8s cluster and listens for recent Pod Events with a particular error message across all namespaces.
+This script runs in a k8s cluster and listens for recent Pod Events
+with a particular error message across all namespaces.
 An error message example could be: Failed to pull image ...
 
 The script goes through this sequence of steps:
@@ -34,8 +35,8 @@ class K8sClass:
         )
 
     def __init__(self, error_message, event_age):
-        self.core_api = client.CoreV1Api()
-        self.namespaces = []
+        self.__core_api = client.CoreV1Api()
+        self.__namespaces = []
         self.__k8s_client_connected = False
         self.error_message = error_message
         # self.poll_interval = 60 if poll_interval is None else poll_interval
@@ -62,7 +63,7 @@ class K8sClass:
                 logging.info(e)
                 raise
             else:
-                logging.debug('Connection to K8s client was established.')
+                logging.info('Connection to K8s client was established.')
                 self.__k8s_client_connected = True
                 return True
         else:
@@ -73,15 +74,15 @@ class K8sClass:
         """"Returns a list of namespaces in the cluster."""
         if self.__initialise_client():
             try:
-                result = self.core_api.list_namespace()
+                result = self.__core_api.list_namespace()
             except Exception as e:
                 logging.info(e)
                 raise
             else:
                 for i in result.items:
-                    self.namespaces.append(i.metadata.name)
-            logging.debug(f'Namespaces: {self.namespaces}')
-            return self.namespaces
+                    self.__namespaces.append(i.metadata.name)
+            logging.debug(f'Namespaces: {self.__namespaces}')
+            return self.__namespaces
         else:
             logging.info('Connection to K8s client failed.')
 
@@ -94,7 +95,7 @@ class K8sClass:
         if self.__initialise_client():
             logging.debug(f'Verifies if Pod {pod_namespace}/{pod_name} exists.')
             try:
-                self.core_api.read_namespaced_pod(pod_name, pod_namespace)
+                self.__core_api.read_namespaced_pod(pod_name, pod_namespace)
             except Exception as e:
                 logging.debug(e)
                 return False
@@ -108,7 +109,7 @@ class K8sClass:
         """Deletes Pod."""
         if self.__initialise_client():
             try:
-                self.core_api.delete_namespaced_pod(pod_name, pod_namespace)
+                self.__core_api.delete_namespaced_pod(pod_name, pod_namespace)
             except Exception as e:
                 logging.info(f'Pod {pod_name} in namespace {pod_namespace} could not be deleted: \n{e}')
                 # raise
@@ -123,10 +124,11 @@ class K8sClass:
         if self.__initialise_client():
             logging.debug(f'Getting {pod_namespace}/{pod_name} Pod status')
             try:
-                result = self.core_api.read_namespaced_pod_status(pod_name, pod_namespace)
+                result = self.__core_api.read_namespaced_pod_status(pod_name, pod_namespace)
             except Exception as e:
                 logging.info(e)
-                raise
+                # raise
+                return ""
             else:
                 pod_status = result.status.phase
                 logging.debug(f' Pod {pod_namespace}/{pod_name} status is: {pod_status}')
@@ -141,11 +143,12 @@ class K8sClass:
         return: {(pod_name, pod_namespace),...}
         """
         if self.__initialise_client():
-            self.namespaces = self.__get_namespaces()
+            self.__namespaces = self.__get_namespaces()
             errored_pods = []
-            for namespace in self.namespaces:
+            current_time = datetime.now(timezone.utc)
+            for namespace in self.__namespaces:
                 try:
-                    result = self.core_api.list_namespaced_event(namespace)
+                    result = self.__core_api.list_namespaced_event(namespace)
                 except Exception as e:
                     logging.info(e)
                     raise
@@ -153,9 +156,9 @@ class K8sClass:
                     for i in result.items:
                         if i.involved_object.kind == 'Pod':
                             # calculate Event age in seconds
-                            event_age = datetime.now(timezone.utc) - i.last_timestamp
+                            event_age = current_time - i.last_timestamp
                             # if event is recent and contains Error message
-                            if event_age.seconds < self.event_age and self.error_message in i.message:
+                            if self.error_message in i.message and event_age.seconds < self.event_age:
                                 event_type = i.type
                                 event_reason = i.reason
                                 event_message = i.message
@@ -163,9 +166,11 @@ class K8sClass:
                                 event_namespace = i.involved_object.namespace
                                 logging.debug(f'{event_type} {event_reason} {event_pod} {event_namespace} \n{event_message}')
                                 if self.__verify_pod_exists(event_pod, event_namespace):
-                                    errored_pods.append((event_pod, event_namespace))
+                                    if self.__get_pod_status(event_pod, event_namespace) == 'Pending':
+                                        errored_pods.append((event_pod, event_namespace))
                                 else:
                                     logging.debug(f"Pod {event_pod} in namespace {event_namespace} doesn't exist anymore!")
+            errored_pods = list(dict.fromkeys(errored_pods))
             if len(errored_pods) > 0:
                 logging.info(f'There are {len(errored_pods)} Pods with Error Event {self.error_message} in Pending state: \n{errored_pods}')
             else:
@@ -223,12 +228,12 @@ def main():
         config.load_kube_config()  # outside cluster authentication
 
     # delete pending pods loop
+    job = K8sClass(
+        error_message=error_message,
+        event_age=polling_interval+2
+        )
     while True:
-        job = K8sClass(
-            error_message=error_message,
-            event_age=polling_interval+2
-            )
-        # job.delete_pending_pods_loop()
+        print()
         job.delete_pending_pods()
         time.sleep(polling_interval)
 
