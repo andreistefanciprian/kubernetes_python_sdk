@@ -6,6 +6,10 @@ env:
 
 tasks:
 
+  generate-pending-pods:
+    cmds:
+      - bash generate_pending_pods.sh
+
   uninstall:
     cmds:
       - helm uninstall {{.APP_NAME}}
