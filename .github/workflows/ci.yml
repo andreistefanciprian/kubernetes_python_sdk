@@ -25,4 +25,4 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: andreistefanciprian/pod-restarter:$GITHUB_SHA"
+          tags: andreistefanciprian/pod-restarter:$GITHUB_SHA
