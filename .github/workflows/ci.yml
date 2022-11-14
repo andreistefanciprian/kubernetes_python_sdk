@@ -11,8 +11,9 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - run: echo ${{ github.sha }}
-      - run: echo ${{ github.repository_owner }}
+      # - run: echo ${{ github.sha }}
+      # - run: echo ${{ github.repository_owner }}
+      - run: echo ${{ github.repository }}
       # -
       #   name: Set up Docker Buildx
       #   uses: docker/setup-buildx-action@v2
@@ -27,4 +28,4 @@ jobs:
       #   uses: docker/build-push-action@v3
       #   with:
       #     push: true
-      #     tags: andreistefanciprian/pod-restarter:${{ github.sha }}
+      #     tags: ${{ github.repository_owner }}/pod-restarter:${{ github.sha }}
