@@ -20,6 +20,7 @@ import time
 from datetime import datetime, timezone
 import os
 import signal
+import argparse
 
 
 class K8sClass:
@@ -34,13 +35,13 @@ class K8sClass:
         level=logging.INFO
         )
 
-    def __init__(self, error_message, event_age):
+    def __init__(self, error_message):
         self.__core_api = client.CoreV1Api()
         self.__namespaces = []
         self.__k8s_client_connected = False
         self.error_message = error_message
         # self.poll_interval = 60 if poll_interval is None else poll_interval
-        self.event_age = event_age
+        # self.event_age = event_age
 
     def __time_track(func):
         """
@@ -86,7 +87,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
-    @__time_track 
+    # @__time_track 
     def __verify_pod_exists(self, pod_name, pod_namespace):
         """
         Verifies if Pod exists.
@@ -104,7 +105,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
-    @__time_track 
+    # @__time_track 
     def __delete_pod(self, pod_name, pod_namespace):
         """Deletes Pod."""
         if self.__initialise_client():
@@ -118,7 +119,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
-    @__time_track 
+    # @__time_track 
     def __get_pod_status(self, pod_name, pod_namespace):
         """"Returns Pod status."""
         if self.__initialise_client():
@@ -136,7 +137,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
-    @__time_track 
+    # @__time_track 
     def __get_pods_with_error_event(self):
         """
         Returns a list of existing Pods with error message in events.
@@ -145,7 +146,7 @@ class K8sClass:
         if self.__initialise_client():
             self.__namespaces = self.__get_namespaces()
             errored_pods = []
-            current_time = datetime.now(timezone.utc)
+            # current_time = datetime.now(timezone.utc)
             for namespace in self.__namespaces:
                 try:
                     result = self.__core_api.list_namespaced_event(namespace)
@@ -156,20 +157,21 @@ class K8sClass:
                     for i in result.items:
                         if i.involved_object.kind == 'Pod':
                             # calculate Event age in seconds
-                            event_age = current_time - i.last_timestamp
+                            # event_age = current_time - i.last_timestamp
                             # if event is recent and contains Error message
-                            if self.error_message in i.message and event_age.seconds < self.event_age:
+                            # if self.error_message in i.message and event_age.seconds < self.event_age:
+                            if self.error_message in i.message:
                                 event_type = i.type
                                 event_reason = i.reason
                                 event_message = i.message
                                 event_pod = i.involved_object.name
-                                event_namespace = i.involved_object.namespace
-                                logging.debug(f'{event_type} {event_reason} {event_pod} {event_namespace} \n{event_message}')
-                                if self.__verify_pod_exists(event_pod, event_namespace):
-                                    if self.__get_pod_status(event_pod, event_namespace) == 'Pending':
-                                        errored_pods.append((event_pod, event_namespace))
+                                event_ns = i.involved_object.namespace
+                                logging.debug(f'{event_type} {event_reason} {event_pod} {event_ns} \n{event_message}')
+                                if self.__verify_pod_exists(event_pod, event_ns):
+                                    if self.__get_pod_status(event_pod, event_ns) == 'Pending':
+                                        errored_pods.append((event_pod, event_ns))
                                 else:
-                                    logging.debug(f"Pod {event_pod} in namespace {event_namespace} doesn't exist anymore!")
+                                    logging.debug(f"Pod {event_pod} in namespace {event_ns} doesn't exist anymore!")
             errored_pods = list(dict.fromkeys(errored_pods))
             if len(errored_pods) > 0:
                 logging.info(f'There are {len(errored_pods)} Pods with Error Event {self.error_message} in Pending state: \n{errored_pods}')
@@ -179,7 +181,7 @@ class K8sClass:
         else:
             logging.info('Connection to K8s client failed.')
 
-    @__time_track 
+    # @__time_track 
     def delete_pending_pods(self):
         """Delete Pending Pods with error message from all namespaces."""
         if self.__initialise_client():
@@ -217,11 +219,21 @@ def handler(signum, frame):
 
 def main():
 
-    error_message = 'Failed to pull image "wrongimage"'
-    kube_auth = os.getenv("KUBE_AUTH_INSIDE_CLUSTER", False)
-    polling_interval = 10   # seconds
+    # define cli params
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--error-message',
+                        type=str,
+                        help="Error mesage to search for in Pending Pods.",
+                        required=True)
+    parser.add_argument('--polling-interval',
+                        type=int,
+                        default=10,
+                        help="Search and delete Pods in Pending state with Error Message every n seconds.",
+                        required=False)
+    args = parser.parse_args()
 
     # authenticate k8s client
+    kube_auth = os.getenv("KUBE_AUTH_INSIDE_CLUSTER", False)
     if kube_auth:
         config.load_incluster_config()  # inside cluster authentication
     else:
@@ -229,17 +241,17 @@ def main():
 
     # delete pending pods loop
     job = K8sClass(
-        error_message=error_message,
-        event_age=polling_interval+2
+        error_message=args.error_message
         )
     while True:
         print()
         job.delete_pending_pods()
-        time.sleep(polling_interval)
+        time.sleep(args.polling_interval)
 
 
 if __name__ == '__main__':
     # catch keyboard interrupt signal and exit gracefully
     signal.signal(signal.SIGINT, handler)
 
+    # start pod restarter
     main()

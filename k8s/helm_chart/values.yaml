@@ -2,6 +2,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+podRestarter:
+  errorMessage: 'Failed to pull image "wrongimage"'
+  pollInterval: 30
+
 image:
   repository: andreistefanciprian/pod-restarter
   pullPolicy: IfNotPresent

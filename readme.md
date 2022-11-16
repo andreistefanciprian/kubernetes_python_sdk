@@ -21,7 +21,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # run script
-python main.py
+python main.py --error-message='Failed to pull image "wrongimage"' --polling-interval=30
 ```
 
 ### Deploy to k8s with helm
