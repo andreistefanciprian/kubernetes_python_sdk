@@ -3,7 +3,8 @@
 # Declare variables to be passed into your templates.
 
 podRestarter:
-  errorMessage: 'Failed to pull image "wrongimage"'
+  # errorMessage: 'Failed to pull image "wrongimage"'
+  errorMessage: container veth name provided (eth0) already exists
   pollInterval: 30
 
 image:
